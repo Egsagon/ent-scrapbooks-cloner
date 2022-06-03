@@ -1,6 +1,6 @@
 import os
 import API
-import imageReader
+from imageReader import ImageWdg
 
 try: import tkinter as tk
 except: os.popen('pip install tk')
@@ -27,7 +27,7 @@ class Main(tk.Tk):
       self.rootBook: dict = None
       self.rawTitle: dict = None
       self.rawSubTitle: dict = None
-      self.folder: dict = None
+      self.folderName: dict = None
       
       # On creation, call login
       self.login()
@@ -236,8 +236,25 @@ class Main(tk.Tk):
       '''
       Demands confirmation on the chosen book.
       '''
+
+      self.clear()
       
-      img = ImageTk.PhotoImage()
+      bookUrl = self.root + self.rootBook['icon'] # if no icon key call client.getBook
+      info = tk.Label(self, text = 'Please confirm the book:')
+      name = tk.Label(self, text = f"name: \"{self.rootBook['name']}\"")
+      img = ImageWdg(self, url = bookUrl)
+
+      cancel = tk.Button(self, text = 'Cancel', command = self.abort)
+      back = tk.Button(self, text = 'Go Back', command = self.getBook)
+      confirm = tk.Button(self, text = 'Next', command = self.getSettings)
+
+      info.pack()
+      name.pack()
+      img.pack()
+
+      cancel.pack()
+      back.pack()
+      confirm.pack()
 
    def getSettings(self) -> None:
       '''
@@ -247,6 +264,11 @@ class Main(tk.Tk):
       self.clear()
       
       def next(*_) -> None:
+         # Save the settings
+         self.rawTitle = title_en.get()
+         self.rawsubTitle = subtt_en.get()
+         self.folderName = repo_en.get()
+
          # Confirmation popup
          popup = tk.Toplevel(self)
          tk.Label(popup, text = 'the duplication is ready to begin. Are you sure you want to do this?\nTextHolder')
@@ -291,6 +313,12 @@ class Main(tk.Tk):
       Duplicates the books.
       '''
       
+      debug('dup', 'Duplication process started')
+
+      length = len(self.students)
+
+      for i, student in enumerate(self.students):
+         debug('dup', f'Duplicating book')
       
 
 
