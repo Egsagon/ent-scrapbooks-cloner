@@ -1,5 +1,6 @@
 import os
 import API
+import imageReader
 
 try: import tkinter as tk
 except: os.popen('pip install tk')
