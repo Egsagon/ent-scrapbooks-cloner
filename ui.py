@@ -1,6 +1,8 @@
 import os
 import API
-import tkinter as tk
+
+try: import tkinter as tk
+except: os.popen('pip install tk')
 
 DODEBUG = True
 def debug(title: str, text: str) -> None:
@@ -228,6 +230,13 @@ class Main(tk.Tk):
       cancel.pack()
       back.pack()
       confirm.pack()
+   
+   def confirmBook(self) -> None:
+      '''
+      Demands confirmation on the chosen book.
+      '''
+      
+      img = ImageTk.PhotoImage()
 
    def getSettings(self) -> None:
       '''
@@ -281,7 +290,7 @@ class Main(tk.Tk):
       Duplicates the books.
       '''
       
-      pass
+      
 
 
 if __name__ == '__main__':
