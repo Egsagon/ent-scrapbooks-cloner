@@ -1,32 +1,27 @@
+'''
+Required modules: tkinter
+install using:
+   pip install tk
+'''
+
+# == Dependencies == #
 import os
 import API
 import threading
 import webbrowser
+import tkinter as tk
+from tkinter import ttk
 
-# TODO - folder check before duplication
-
-try:
-   import tkinter as tk
-   from tkinter import ttk
-
-except:
-   os.popen('pip install tk')
-   
-   import tkinter as tk
-   from tkinter import ttk
-
-# = Settings ====== #
+# = Settings ======= #
 MAX_RETRIES = 3
 DODEBUG = True
-# ================= #
+# ================== #
 
 def debug(title: str, text: str) -> None:
    if DODEBUG: print('[  \033[91m' + title.upper()[:4] + '\033[0m  ] ' + text)
 
-class NoId(Exception): pass
-
 class Main(tk.Tk):
-   def __init__(self) -> None:
+   def __init__(self, start: bool = True) -> None:
       '''Represents the application.'''
       
       # Main window
@@ -57,7 +52,7 @@ class Main(tk.Tk):
       self.secondProgressBar: ttk.Progressbar = None
       
       # Start application
-      self.login()
+      if start: self.login()
 
    def clear(self) -> None:
       '''
@@ -109,12 +104,10 @@ class Main(tk.Tk):
       
       usr_field = tk.Entry(popup)
       pwd_field = tk.Entry(popup, show = '*')
-      # togglePWD = tk.IntVar()
-      # showPWD = tk.Checkbutton(popup, text = 'Show password', variable = togglePWD,
-      #                          command = lambda *_: pwd_field.config(show = (None, '*')[togglePWD.get()]))
-      
       abort = tk.Button(popup, text = 'Cancel', command = self.abort)
       confirm = tk.Button(popup, text = 'OK', command = check)
+      
+      pwd_field.bind('<Return>', check)
       
       info.pack()
       usr_field.pack()
@@ -295,7 +288,7 @@ class Main(tk.Tk):
       ct_repo = tk.LabelFrame(self, text = 'Folder', labelanchor = 'n')
       
       # Title
-      tk.Label(ct_title, text = "The %name% variable will be replaced by the name of the student.").pack()
+      tk.Label(ct_title, text = "The %name% variable will be replaced by the name of the student. Please don't use too 'fancy' chars.").pack()
       title_en = tk.Entry(ct_title)
       title_en.insert(-1, 'Book of %name%')
       
@@ -305,7 +298,7 @@ class Main(tk.Tk):
       subtt_en.insert(-1, str(f"Duplicate of {self.rootBook['name']}"))
       
       # Folder
-      tk.Label(ct_subtt, text = 'The name of the folder that will be created to contain the books.').pack()
+      tk.Label(ct_subtt, text = 'The name of the folder that will be created to contain the books.\nPlease make sure that you don\'t use an already existing book.').pack()
       repo_en = tk.Entry(ct_repo)
       
       info.pack()
@@ -337,10 +330,10 @@ class Main(tk.Tk):
          
          # Update app
          self.progress.set(text)
-         self.mainProgressBar.step((i * 100) / length)
+         self.mainProgressBar.step((i / length) * 100)
          self.secondProgressBar.step(33)
          
-         # Duplication
+         # Duplicate
          for retry in range(MAX_RETRIES):
             try:
                currentBookId = self.client.duplicateBook(self.rootBook)
@@ -350,35 +343,56 @@ class Main(tk.Tk):
                self.secondProgressBar.step(33)
                break
             
+            except API.DataErr:
+               print('FAIL on DUPLICATE, retrying')
+            
             except Exception as e:
-               print(f'\nRaised exception: {e} | {e.args} (attempt {retry}/{MAX_RETRIES})')
+               print(f'\nRaised exception: {e} (attempt {retry}/{MAX_RETRIES})')
          
          # Rename
-         cur_title = self.rawTitle
-         if '%name%' in cur_title: cur_title = cur_title.replace('%name%', student['name'])
-         
-         cur_subTitle = self.rawSubTitle
-         if '%name%' in cur_subTitle: cur_subTitle = cur_subTitle.replace('%name%', student['name'])
-         
-         self.client.renameBook(currentBook, cur_title, cur_subTitle)
-         debug('duplication', '[Renamed]')
-         self.secondProgressBar.step(33)
-         
-         createdBooksIds.append(currentBook['_id'])
+         for retry in range(MAX_RETRIES):
+            try:
+               cur_title = self.rawTitle
+               if '%name%' in cur_title: cur_title = cur_title.replace('%name%', student['name'])
+               
+               cur_subTitle = self.rawSubTitle
+               if '%name%' in cur_subTitle: cur_subTitle = cur_subTitle.replace('%name%', student['name'])
+               
+               self.client.renameBook(currentBook, cur_title, cur_subTitle)
+               
+               createdBooksIds.append(currentBook['_id'])
+               
+               debug('duplication', '[Renamed]')
+               self.secondProgressBar.step(33)
+               break
+            
+            except API.DataErr:
+               print('FAIL on RENAME, retrying')
+            
+            except Exception as e:
+               print(f'\nRaised exception: {e} (attempt {retry}/{MAX_RETRIES})')
       
-      debug('duplication', 'Finished duplicatio process')
+      debug('duplication', 'Finished duplication process')
       
       # Add to book
+      
       folderIds = self.client.getFolderByName(self.folderName)
       bookId: str = None
       
-      if folderIds == []: bookId = self.client.createFolder(self.folderName)
-      else: bookId = folderIds[0]
+      if folderIds == []:
+         # Create new book
+         bookId = self.client.createFolder(self.folderName)
+         
+      else:
+         # Get the first matching id
+         bookId = folderIds[0]
       
-      self.client.makeFolder2(bookId, createdBooksIds)
+      # Paste the books into the folder
+      self.client.makeFolder2(bookId, createdBooksIds, self.folderName)
       
       debug('duplication', f'Moved books into folder {self.folderName}')
       
+      # Finish
       self.finish()
 
    def start(self) -> None:
@@ -426,7 +440,7 @@ class Main(tk.Tk):
 if __name__ == '__main__':
    os.system('clear')
    debug('info', f'Started app from {__file__}')
-
+   
    app = Main()
    app.title('TK-ENT')
    app.mainloop()

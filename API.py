@@ -1,6 +1,7 @@
 import json, requests
 
 class CredErr(Exception): pass
+class DataErr(Exception): pass
 
 class Connection:
    def __init__(self, usr: str, pwd: str) -> None:
@@ -63,12 +64,12 @@ class Connection:
       
       return res.json()['_id']
 
-   def makeFolder2(self, folderId: str, bookIds: list) -> None:
+   def makeFolder2(self, folderId: str, bookIds: list, title: str = 'NULL') -> None:
       '''
       Creates a folder and returns its id.
       '''
       
-      data = {"parentId":"root","title":"testetsfdf","ressourceIds": bookIds}
+      data = {"parentId":"root","title":str(title),"ressourceIds": bookIds}
       
       res = self.session.put(self.root + f'/scrapbook/folder/{folderId}', data = json.dumps(data), headers = self.XSRF)
       
@@ -124,24 +125,28 @@ class Connection:
       Renames a book.
       '''
       
-      # If book id is given
-      if isinstance(book, str): book = self.getBook(book)
-      
-      # If light version is given
-      elif not 'pages' in book.keys(): book = self.getBook(book['_id'])
-      
-      book_id = book['_id']
-      scrapBook = self.getBook(book_id)
-      
-      data = {}
-      data['title'] = name
-      data['subTitle'] = subtitle
-      data['coverColor'] = scrapBook['coverColor']
-      data['icon'] = scrapBook['icon']
-      data['trashed'] = 0
+      try:
+         # If book id is given
+         if isinstance(book, str): book = self.getBook(book)
+         
+         # If light version is given
+         elif not 'pages' in book.keys(): book = self.getBook(book['_id'])
+         
+         book_id = book['_id']
+         scrapBook = self.getBook(book_id)
+         
+         data = {}
+         data['title'] = name
+         data['subTitle'] = subtitle
+         data['coverColor'] = scrapBook['coverColor']
+         data['icon'] = scrapBook['icon']
+         data['trashed'] = 0
 
-      res = self.session.put(f'https://ent.iledefrance.fr/scrapbook/{book_id}', data = json.dumps(data), headers = self.XSRF)
-      if 'error' in res.json().keys(): raise Exception('Duplication failed.')
+         res = self.session.put(f'https://ent.iledefrance.fr/scrapbook/{book_id}', data = json.dumps(data), headers = self.XSRF)
+         if 'error' in res.json().keys(): raise Exception('Duplication failed.')
+      
+      except json.JSONDecodeError: raise DataErr('Invalid received json')
+      except requests.JSONDecodeError: raise DataErr('Invalid received json')
 
    def createFolder(self, name: str) -> str:
       '''
