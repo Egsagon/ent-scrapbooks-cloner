@@ -1,33 +1,28 @@
 '''
-Module that creates a tk widget from an image url.
 '''
 
+import os
+import API
 from tkinter import Label, Tk
 from PIL import Image, ImageTk
-from urllib2 import urlopen
+from urllib.request import urlopen
 from io import BytesIO
 
-class ImageWdg(object):
-  def __init__(self, *args, url: str) -> None:
-    '''
-    Represents an image widget.
-    '''
-    
-    # Open URL
-    nav = urlopen(url)
-    raw = nav.read()
-    nav.close()
-    
-    # Create image
-    image = Image.open(BytesIO(raw))
-    photo = ImageTk.PhotoImage(image)
-    
-    # Build the widget
-    return Label(*args, image = photo)
+def saveImage(client: API.Connection, url: str, path: str) -> None:
+  '''
+  Save an image from an url.
+  '''
+  
+  res = client.session.get(url)
+  open(path, 'wb').write(res.content)
 
-if __name__ == '__main__':
-  root = Tk()
-  url = 'https://ent.iledefrance.fr/workspace/document/861b0a56-35b9-4f4d-bff2-6a449d3f8b97?thumbnail=120x120&t=1654250758706'
-  image = ImageWdg(root, url)
-  image.pack()
-  root.mainloop()
+
+client = API.Connection('raphael.kern', input('pwd > '))
+url = 'https://ent.iledefrance.fr/workspace/document/26ab40c4-9004-40e2-a116-d9a3669bbd12?thumbnail=120x120&t=1654328718338'
+
+root = Tk()
+
+img = Image(root, client, url)
+img.pack()
+
+root.mainloop()

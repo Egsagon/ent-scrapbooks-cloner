@@ -1,35 +1,62 @@
 import os
 import API
-from imageReader import ImageWdg
+import threading
+import webbrowser
 
-try: import tkinter as tk
-except: os.popen('pip install tk')
+# TODO - folder check before duplication
 
+try:
+   import tkinter as tk
+   from tkinter import ttk
+
+except:
+   os.popen('pip install tk')
+   
+   import tkinter as tk
+   from tkinter import ttk
+
+# = Settings ====== #
+MAX_RETRIES = 3
 DODEBUG = True
+# ================= #
+
 def debug(title: str, text: str) -> None:
-   if DODEBUG: print('[\033[91m' + title.upper() + '\033[0m] ' + text)
+   if DODEBUG: print('[  \033[91m' + title.upper()[:4] + '\033[0m  ] ' + text)
+
+class NoId(Exception): pass
 
 class Main(tk.Tk):
    def __init__(self) -> None:
       '''Represents the application.'''
       
+      # Main window
       tk.Tk.__init__(self)
       self.client: API.Connection = None
       self.geometry('400x400')
       
       debug('main', 'Initialized app')
       
-      # User choices
+      # Students choices
       self.structure: dict = None
       self.classe: dict = None
       self.students: list = None
       
+      # Preferences
       self.rootBook: dict = None
-      self.rawTitle: dict = None
-      self.rawSubTitle: dict = None
-      self.folderName: dict = None
+      self.rawTitle: str = None
+      self.rawSubTitle: str = None
+      self.folderName: str = None
       
-      # On creation, call login
+      # Progress variables
+      self.progress: tk.StringVar = tk.StringVar(self, '...')
+      self.overallProg: int = 0
+      self.selfProg: int = 0
+      
+      # Progress bars
+      self.mainProgressBar: ttk.Progressbar = None
+      self.secondProgressBar: ttk.Progressbar = None
+      
+      # Start application
       self.login()
 
    def clear(self) -> None:
@@ -56,6 +83,8 @@ class Main(tk.Tk):
       info.pack()
       cancel.pack()
       abort.pack()
+      
+      popup.title('TK-ENT')
 
    def login(self) -> None:
       '''Opens a popup'''
@@ -231,30 +260,6 @@ class Main(tk.Tk):
       cancel.pack()
       back.pack()
       confirm.pack()
-   
-   def confirmBook(self) -> None:
-      '''
-      Demands confirmation on the chosen book.
-      '''
-
-      self.clear()
-      
-      bookUrl = self.root + self.rootBook['icon'] # if no icon key call client.getBook
-      info = tk.Label(self, text = 'Please confirm the book:')
-      name = tk.Label(self, text = f"name: \"{self.rootBook['name']}\"")
-      img = ImageWdg(self, url = bookUrl)
-
-      cancel = tk.Button(self, text = 'Cancel', command = self.abort)
-      back = tk.Button(self, text = 'Go Back', command = self.getBook)
-      confirm = tk.Button(self, text = 'Next', command = self.getSettings)
-
-      info.pack()
-      name.pack()
-      img.pack()
-
-      cancel.pack()
-      back.pack()
-      confirm.pack()
 
    def getSettings(self) -> None:
       '''
@@ -265,18 +270,24 @@ class Main(tk.Tk):
       
       def next(*_) -> None:
          # Save the settings
+         # TODO - Check if settings are valid
          self.rawTitle = title_en.get()
-         self.rawsubTitle = subtt_en.get()
+         self.rawSubTitle = subtt_en.get()
          self.folderName = repo_en.get()
+         debug('set', f'Saved settings {self.rawTitle}, {self.rawSubTitle}, {self.folderName}')
 
          # Confirmation popup
          popup = tk.Toplevel(self)
-         tk.Label(popup, text = 'the duplication is ready to begin. Are you sure you want to do this?\nTextHolder')
+         tk.Label(popup, text = 'the duplication is ready to begin. Are you sure you want to do this?\n___').pack()
          tk.Button(popup, text = 'No', command = popup.destroy).pack()
          tk.Button(popup, text = 'Yes', command = self.start).pack()
+         
+         popup.title('TK-ENT')
       
       info = tk.Label(self, text = 'Settings')
-      confirm = tk.Button(self, text = 'Start duplication')
+      cancel = tk.Button(self, text = 'Cancel', command = self.abort)
+      back = tk.Button(self, text = 'Back', command = self.getBook)
+      confirm = tk.Button(self, text = 'Start duplication', command = next)
       
       # Create containers
       ct_title = tk.LabelFrame(self, text = 'Titles', labelanchor = 'n')
@@ -291,7 +302,7 @@ class Main(tk.Tk):
       # Subtitle
       tk.Label(ct_subtt, text = 'Same than the title input.').pack()
       subtt_en = tk.Entry(ct_subtt)
-      subtt_en.insert(-1, f"Duplicate of {self.rootBook['name']}")
+      subtt_en.insert(-1, str(f"Duplicate of {self.rootBook['name']}"))
       
       # Folder
       tk.Label(ct_subtt, text = 'The name of the folder that will be created to contain the books.').pack()
@@ -306,24 +317,115 @@ class Main(tk.Tk):
       ct_subtt.pack(expand = True, fill = 'x')
       ct_repo.pack(expand = True, fill = 'x')
       
+      cancel.pack()
+      back.pack()
       confirm.pack()
-   
+
+   def duplicate(self) -> None:
+      '''
+      Duplicating process.
+      '''
+      
+      length = len(self.students)
+      createdBooksIds = []
+      
+      for i, student in enumerate(self.students):
+         
+         # Debug
+         text = f'Duplicating book for {student["name"]} ({i + 1}/{length})'
+         debug('dupl', text)
+         
+         # Update app
+         self.progress.set(text)
+         self.mainProgressBar.step((i * 100) / length)
+         self.secondProgressBar.step(33)
+         
+         # Duplication
+         for retry in range(MAX_RETRIES):
+            try:
+               currentBookId = self.client.duplicateBook(self.rootBook)
+               currentBook = self.client.getBook(currentBookId)
+               
+               debug('duplication', '[Duplicated]')
+               self.secondProgressBar.step(33)
+               break
+            
+            except Exception as e:
+               print(f'\nRaised exception: {e} | {e.args} (attempt {retry}/{MAX_RETRIES})')
+         
+         # Rename
+         cur_title = self.rawTitle
+         if '%name%' in cur_title: cur_title = cur_title.replace('%name%', student['name'])
+         
+         cur_subTitle = self.rawSubTitle
+         if '%name%' in cur_subTitle: cur_subTitle = cur_subTitle.replace('%name%', student['name'])
+         
+         self.client.renameBook(currentBook, cur_title, cur_subTitle)
+         debug('duplication', '[Renamed]')
+         self.secondProgressBar.step(33)
+         
+         createdBooksIds.append(currentBook['_id'])
+      
+      debug('duplication', 'Finished duplicatio process')
+      
+      # Add to book
+      folderIds = self.client.getFolderByName(self.folderName)
+      bookId: str = None
+      
+      if folderIds == []: bookId = self.client.createFolder(self.folderName)
+      else: bookId = folderIds[0]
+      
+      self.client.makeFolder2(bookId, createdBooksIds)
+      
+      debug('duplication', f'Moved books into folder {self.folderName}')
+      
+      self.finish()
+
    def start(self) -> None:
       '''
       Duplicates the books.
       '''
       
-      debug('dup', 'Duplication process started')
-
-      length = len(self.students)
-
-      for i, student in enumerate(self.students):
-         debug('dup', f'Duplicating book')
+      self.clear()
       
+      debug('dup', 'Duplication process started')
+      
+      info = tk.Label(self, textvariable = self.progress)
+      cancel = tk.Button(self, text = 'Abort', command = self.abort)
+      self.mainProgressBar = ttk.Progressbar(self)
+      self.secondProgressBar = ttk.Progressbar(self)
+      
+      info.pack()
+      self.secondProgressBar.pack()
+      self.mainProgressBar.pack()
+      cancel.pack()
+      
+      # Start duplication
+      threading.Thread(target = self.duplicate).start()
+
+   def finish(self) -> None:
+      '''
+      Shows a popup that informs the end of the process.
+      '''
+      
+      def ent(*_) -> None: webbrowser.open_new('https://ent.iledefrance.fr/scrapbook')
+      
+      popup = tk.Toplevel(self)
+      
+      info = tk.Label(popup, text = 'The process has finished.')
+      info2 = tk.Label(popup, text = 'You may now open/reload the ENT to see changes.')
+      close = tk.Button(popup, text = 'Close', command = self.destroy)
+      open = tk.Button(popup, text = 'Open ENT', command = ent)
+      
+      info.pack()
+      info2.pack()
+      close.pack()
+      open.pack()
 
 
 if __name__ == '__main__':
    os.system('clear')
+   debug('info', f'Started app from {__file__}')
 
    app = Main()
    app.title('TK-ENT')

@@ -54,6 +54,7 @@ class Connection:
    def makeFolder(self, name: str, contains: list = [], on: str = 'root') -> str:
       '''
       Creates a folder and returns its id.
+      // contains: list of books ids. //
       '''
       
       data = {"parentId": on, "title": name, "ressourceIds": contains}
@@ -61,6 +62,31 @@ class Connection:
       res = self.session.post(self.root + '/scrapbook/folder', data = json.dumps(data), headers = self.XSRF)
       
       return res.json()['_id']
+
+   def makeFolder2(self, folderId: str, bookIds: list) -> None:
+      '''
+      Creates a folder and returns its id.
+      '''
+      
+      data = {"parentId":"root","title":"testetsfdf","ressourceIds": bookIds}
+      
+      res = self.session.put(self.root + f'/scrapbook/folder/{folderId}', data = json.dumps(data), headers = self.XSRF)
+      
+      if not 'number' in res.json(): raise Exception('Failed to put in folder')
+   
+   def getFolderByName(self, name: str) -> list:
+      '''
+      Retrieve folders ids depending on a name.
+      '''
+      
+      res = self.session.get(self.root + '/scrapbook/folder/list/all', headers = self.XSRF)
+      
+      found = []
+      
+      for folder in res.json():
+         if folder['title'] == name: found.append(folder['_id'])
+      
+      return found
 
    def getBooks(self) -> list:
       '''
@@ -117,9 +143,20 @@ class Connection:
       res = self.session.put(f'https://ent.iledefrance.fr/scrapbook/{book_id}', data = json.dumps(data), headers = self.XSRF)
       if 'error' in res.json().keys(): raise Exception('Duplication failed.')
 
+   def createFolder(self, name: str) -> str:
+      '''
+      Creates a folder the root and returns its id.
+      '''
+      
+      data = {"parentId": "root", "title": name, "ressourceIds": []}
+      
+      res = self.session.post(self.root + '/scrapbook/folder', data = json.dumps(data), headers = self.XSRF)
+      
+      return res.json()['_id']
+
 if 0 and __name__ == '__main__':
    
-   client = Connection('raphael.kern', open('pwd', 'r').read().replace('\n', ''))
+   # client = Connection('raphael.kern', open('pwd', 'r').read().replace('\n', ''))
    
    '''
    # Get structures
