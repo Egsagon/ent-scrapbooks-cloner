@@ -1,8 +1,10 @@
-'''
-Required modules: tkinter
-install using:
-   pip install tk
-'''
+# ================== #
+# Required modules: tkinter
+# install using: pip install tk
+   
+# Github: https://github.com/Egsagon/sb_ent_gest5
+# ================== #
+
 
 # == Dependencies == #
 import os
@@ -12,13 +14,16 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+
 # = Settings ======= #
 MAX_RETRIES = 3
 DODEBUG = True
 # ================== #
 
+
 def debug(title: str, text: str) -> None:
    if DODEBUG: print('[  \033[91m' + title.upper()[:4] + '\033[0m  ] ' + text)
+
 
 class Main(tk.Tk):
    def __init__(self, start: bool = True) -> None:
@@ -437,6 +442,7 @@ class Main(tk.Tk):
       open.pack()
 
 
+# = Main loop ====== #
 if __name__ == '__main__':
    os.system('clear')
    debug('info', f'Started app from {__file__}')
