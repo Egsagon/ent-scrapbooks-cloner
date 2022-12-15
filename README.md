@@ -5,3 +5,7 @@ Small script that allows user of the ENT to duplicate scrapbooks automatically f
  # Running
  
  Just run the `ui.py` file.
+
+## License
+
+See the LICENSE file.
